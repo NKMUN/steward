@@ -1,6 +1,6 @@
 <template>
   <div class="scanner">
-    <video class="preview blur" :width="width" :height="height" ref="video" autoplay />
+    <video class="preview blur" ref="video" @timeupdate="scanFrame" />
     <svg class="overlay" viewBox="0 0 640 640" shape-rendering="crispEdges">
       <path class="mask" d="m0,0 h640v640h-640v-640 m120,120 h400v400h-400v-400z" fill="black" fill-opacity="0.6" fill-rule="evenodd" />
       <path class="inner-edge" d="m120,120 h400v400h-400v-400z" stroke="#57acf1"  stroke-width="4" fill="transparent"/>
@@ -9,10 +9,25 @@
     <div class="hint">
       将二维码放入框内，即可自动扫描
     </div>
+    <canvas ref="canvas" />
+    <pre class="debugger">
+      lastTime: <span id="_dtime"></span>
+      lastResult: {{ lastResult }}
+    </pre>
   </div>
 </template>
 
 <script>
+import QrWorker from '@/qr.worker.js'
+const qr = new QrWorker()
+let startTime = Date.now()
+qr.onmessage = ev => {
+  document.getElementById('_dtime').innerHTML = `${Date.now() - startTime}`
+  const [error, result] = ev.data
+  if (!error && qr.callback)
+    qr.callback(error, result) 
+}
+
 export default {
   props: {
     width: {
@@ -31,7 +46,9 @@ export default {
   data() {
     return {
       stream: null,
-      tracks: []
+      tracks: [],
+      lastTime: null,
+      lastResult: null
     }
   },
   methods: {
@@ -50,9 +67,19 @@ export default {
           this.stream = stream
           this.tracks = stream.getVideoTracks()
           const { width, height } = this.tracks[0].getSettings()
+          console.log(stream.getVideoTracks()[0])
+          console.log(stream.getVideoTracks()[0].getSettings())
           this.$refs.video.width = width
           this.$refs.video.height = height
           this.$refs.video.srcObject = stream
+          this.$refs.video.play()
+          const vMin = Math.min(width, height, 480)
+          this.$refs.canvas.height = vMin
+          this.$refs.canvas.width = vMin
+          qr.callback = (err, result) => {
+            this.$emit('code', result)
+            this.lastResult = result.result
+          }
         },
         error => {
           this.$emit('error', error)
@@ -66,11 +93,35 @@ export default {
       this.tracks.forEach(track => track.stop)
       this.tracks = []
       this.$refs.video.srcObject = null
+      qr.callback = () => {}
+    },
+    scanFrame() {
+      // compute qr code capture area
+      // should be the image presented on screen
+      const {video, canvas} = this.$refs
+      const {
+        width: vW,
+        height: vH
+      } = video
+      const {
+        width: cW,
+        height: cH
+      } = canvas
+      const vMin = Math.min(vW, vH)
+      const cMin = Math.min(cW, cH)
+      const startX = (vW - vMin) / 2 + Math.floor(vMin * 0.2)
+      const startY = (vH - vMin) / 2 + Math.floor(vMin * 0.2)
+      const scanX = Math.floor(vMin * 0.6)
+      const scanY = Math.floor(vMin * 0.6)
+      const ctx = canvas.getContext('2d')
+      console.log(`${startX}, ${startY}, ${scanX}, ${scanY}, 0, 0, ${cW}, ${cH}`)
+      ctx.drawImage(video, startX, startY, scanX, scanY, 0, 0, cW, cH)
+      startTime = Date.now()
+      qr.postMessage(ctx.getImageData(0, 0, cW, cH))
     }
   },
   mounted() {
     document.addEventListener('visibilitychange', () => {
-      console.log(document.visibilityState)
       if (document.visibilityState === 'visible') {
         this.$emit('document:visible')
       } else {
@@ -147,4 +198,12 @@ export default {
     rgba(30,87,153,0) 100%
   )
   animation: 2s ease-in-out 0s infinite alternate both running bar-scan
+canvas
+  position: fixed
+  top: 400px
+  left: 0
+.debugger
+  position: fixed
+  bottom: 0
+  background-color: white
 </style>
