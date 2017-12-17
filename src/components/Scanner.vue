@@ -1,6 +1,6 @@
 <template>
   <div class="scanner">
-    <video class="preview blur" ref="video" @timeupdate="scanFrame" />
+    <video class="preview blur" ref="video" @timeupdate="scanFrame" @loadedmetadata="handleVideoMeta"/>
     <svg class="overlay" viewBox="0 0 640 640" shape-rendering="crispEdges">
       <path class="mask" d="m0,0 h640v640h-640v-640 m120,120 h400v400h-400v-400z" fill="black" fill-opacity="0.6" fill-rule="evenodd" />
       <path class="inner-edge" d="m120,120 h400v400h-400v-400z" stroke="#57acf1"  stroke-width="4" fill="transparent"/>
@@ -46,7 +46,6 @@ export default {
   data() {
     return {
       stream: null,
-      tracks: [],
       lastTime: null,
       lastResult: null
     }
@@ -63,23 +62,9 @@ export default {
       }).then(
         stream => {
           this.$emit('started', stream)
-          console.log(stream)
           this.stream = stream
-          this.tracks = stream.getVideoTracks()
-          const { width, height } = this.tracks[0].getSettings()
-          console.log(stream.getVideoTracks()[0])
-          console.log(stream.getVideoTracks()[0].getSettings())
-          this.$refs.video.width = width
-          this.$refs.video.height = height
           this.$refs.video.srcObject = stream
           this.$refs.video.play()
-          const vMin = Math.min(width, height, 480)
-          this.$refs.canvas.height = vMin
-          this.$refs.canvas.width = vMin
-          qr.callback = (err, result) => {
-            this.$emit('code', result)
-            this.lastResult = result.result
-          }
         },
         error => {
           this.$emit('error', error)
@@ -89,11 +74,26 @@ export default {
       )
     },
     stopCapture() {
+      this.stream.getVideoTracks().forEach(track => track.stop())
       this.stream = null
-      this.tracks.forEach(track => track.stop)
-      this.tracks = []
       this.$refs.video.srcObject = null
       qr.callback = () => {}
+    },
+    handleVideoMeta(ev) {
+      // hack for safari's failure to provide height/width in MediaStreamTrack.getSettings()
+      const {
+        videoWidth: width,
+        videoHeight: height
+      } = this.$refs.video
+      this.$refs.video.width = width
+      this.$refs.video.height = height
+      const vMin = Math.min(width, height, 480)
+      this.$refs.canvas.height = vMin
+      this.$refs.canvas.width = vMin
+      qr.callback = (err, result) => {
+        this.$emit('code', result)
+        this.lastResult = result.result
+      }
     },
     scanFrame() {
       // compute qr code capture area
