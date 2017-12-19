@@ -10,22 +10,28 @@
       将二维码放入框内，即可自动扫描
     </div>
     <canvas ref="canvas" />
-    <pre class="debugger">
-      lastTime: <span id="_dtime"></span>
-      lastResult: {{ lastResult }}
-    </pre>
   </div>
 </template>
 
 <script>
 import QrWorker from '@/qr.worker.js'
 const qr = new QrWorker()
-let startTime = Date.now()
+qr.startTime = Date.now()
+qr.busy = false
 qr.onmessage = ev => {
-  document.getElementById('_dtime').innerHTML = `${Date.now() - startTime}`
+  qr.busy = false
   const [error, result] = ev.data
-  if (!error && qr.callback)
-    qr.callback(error, result) 
+  if (!error && qr.callback) qr.callback(error, result)
+  if (qr.statCallback) qr.statCallback(Date.now() - qr.startTime, error, result)
+}
+qr.decode = imageData => {
+  if (qr.busy) {
+    return false
+  }
+  qr.startTime = Date.now()
+  qr.postMessage(imageData)
+  qr.busy = true
+  return true
 }
 
 export default {
@@ -45,9 +51,7 @@ export default {
   },
   data() {
     return {
-      stream: null,
-      lastTime: null,
-      lastResult: null
+      stream: null
     }
   },
   methods: {
@@ -74,10 +78,12 @@ export default {
       )
     },
     stopCapture() {
+      if (!this.stream) return
       this.stream.getVideoTracks().forEach(track => track.stop())
       this.stream = null
       this.$refs.video.srcObject = null
       qr.callback = () => {}
+      qr.statCallback = () => {}
     },
     handleVideoMeta(ev) {
       // hack for safari's failure to provide height/width in MediaStreamTrack.getSettings()
@@ -87,18 +93,21 @@ export default {
       } = this.$refs.video
       this.$refs.video.width = width
       this.$refs.video.height = height
-      const vMin = Math.min(width, height, 480)
+      const vMin = Math.min(width, height)
       this.$refs.canvas.height = vMin
       this.$refs.canvas.width = vMin
       qr.callback = (err, result) => {
         this.$emit('code', result)
-        this.lastResult = result.result
+      }
+      qr.statCallback = (time, error) => {
+        this.$emit('internal-stats', time, error)
       }
     },
     scanFrame() {
       // compute qr code capture area
       // should be the image presented on screen
       const {video, canvas} = this.$refs
+      if (!video || !canvas) return
       const {
         width: vW,
         height: vH
@@ -109,15 +118,13 @@ export default {
       } = canvas
       const vMin = Math.min(vW, vH)
       const cMin = Math.min(cW, cH)
-      const startX = (vW - vMin) / 2 + Math.floor(vMin * 0.2)
-      const startY = (vH - vMin) / 2 + Math.floor(vMin * 0.2)
-      const scanX = Math.floor(vMin * 0.6)
-      const scanY = Math.floor(vMin * 0.6)
+      const startX = (vW - vMin) / 2 + Math.floor(vMin * 0.15)
+      const startY = (vH - vMin) / 2 + Math.floor(vMin * 0.15)
+      const scanX = Math.floor(vMin * 0.7)
+      const scanY = Math.floor(vMin * 0.7)
       const ctx = canvas.getContext('2d')
-      console.log(`${startX}, ${startY}, ${scanX}, ${scanY}, 0, 0, ${cW}, ${cH}`)
       ctx.drawImage(video, startX, startY, scanX, scanY, 0, 0, cW, cH)
-      startTime = Date.now()
-      qr.postMessage(ctx.getImageData(0, 0, cW, cH))
+      qr.decode(ctx.getImageData(0, 0, cW, cH))
     }
   },
   mounted() {
@@ -199,11 +206,11 @@ export default {
   )
   animation: 2s ease-in-out 0s infinite alternate both running bar-scan
 canvas
+  display: none
+.debug .canvas
+  display: block
   position: fixed
-  top: 400px
+  z-index: 1000
+  top: 300
   left: 0
-.debugger
-  position: fixed
-  bottom: 0
-  background-color: white
 </style>
