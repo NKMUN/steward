@@ -255,24 +255,24 @@ export default {
   .icon
     transition: color .5s
   &.idle, &.busy
-    background-color: #00458a
+    background-color: #409eff
     .icon
-      color: #c5e2ff
+      color: #bae3ff
   &.error, &.forbidden
-    background-color: #5f1b1b
+    background-color: #f56c6c
     .icon
-      color: #ffa7a7
+      color: #ffedeb
   &.warning, &.uncertain
-    background-color: #672b00
+    background-color: #e6a23c
     .icon
-      color: #fff9c7
+      color: #ffebbd
   &.busy
     .icon
       animation: 2s linear 0s infinite normal both running spin
   &.success
-    background-color: #294a40
+    background-color: #67c23a
     .icon
-      color: #86f74f
+      color: #cbe8b5
   &.nerd
     background-color: #333
 </style>
