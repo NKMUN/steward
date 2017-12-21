@@ -13,6 +13,7 @@
       <div class="state">
         <Icon
           @touchend.native.prevent="handleNerd"
+          @click.native.prevent="handleNerd"
           class="icon"
           :name="stateIcon"
         />
