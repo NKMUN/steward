@@ -2,8 +2,14 @@
   <div class="scanner">
     <video class="preview blur" ref="video" @timeupdate="scanFrame" @loadedmetadata="handleVideoMeta"/>
     <svg class="overlay" viewBox="0 0 640 640" shape-rendering="crispEdges">
-      <path class="mask" d="m0,0 h640v640h-640v-640 m120,120 h400v400h-400v-400z" fill="black" fill-opacity="0.6" fill-rule="evenodd" />
-      <path class="inner-edge" d="m120,120 h400v400h-400v-400z" stroke="#57acf1"  stroke-width="4" fill="transparent"/>
+      <defs>
+        <mask id="clip">
+          <rect x="-640" y="-640" width="1920" height="1920" fill="white" />
+          <rect id="bg" x="120" y="120" width="400" height="400" fill="black"/>
+        </mask>
+      </defs>
+      <rect class="mask" x="-640" y="-640" width="1920" height="1920" mask="url(#clip)" fill="black" fill-opacity="0.6" />
+      <path class="inner-edge" d="m120,120 h400v400h-400v-400z" stroke="#57acf1"  stroke-width="4" fill="transparent" />
     </svg>
     <div class="bar" v-if="Boolean(stream)"></div>
     <div class="hint">
@@ -142,10 +148,10 @@ export default {
 }
 .scanner
   display: inline-block
-  width: 100%
-  max-width: 100vmin
-  max-height: 100vmin
-  overflow: hidden
+  width: 100vmin
+  height: 100vmin
+  overflow-x: visible
+  overflow-y: hidden
   position: relative
   &:after
     content: " "
@@ -192,10 +198,13 @@ export default {
   animation: 2s ease-in-out 0s infinite alternate both running bar-scan
 canvas
   display: none
-.debug .canvas
-  display: block
-  position: fixed
-  z-index: 1000
-  top: 300
-  left: 0
+@media screen and (orientation: portrait)
+  .scanner
+    max-height: 600px
+@media screen and (orientation: landscape)
+  .scanner
+    max-width: 540px
+    max-height: 540px
+    overflow-x: hidden
+    overflow-y: visible
 </style>

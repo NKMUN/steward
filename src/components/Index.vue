@@ -1,6 +1,6 @@
 <template>
   <div class="main">
-    
+
     <Scanner
       @code="handleCode"
       @error="handleCaptureError"
@@ -28,7 +28,7 @@
         扫描时间 <br>
       </div>
     </div>
-    
+
   </div>
 </template>
 
@@ -91,7 +91,7 @@ export default {
       if (payload === this.lastResult) return
       this.lastResult = payload
       this.busy = true
-      
+
       // get object unique identifier
       const {
         hostname,
@@ -121,7 +121,7 @@ export default {
             .ok( ({ok, status}) => ok || status === 400 )
             .set('X-Steward', 'Steward')
             .send({
-              identifier,    
+              identifier,
               steward: {
                 // TODO: local authorization
               }
@@ -206,6 +206,7 @@ export default {
   justify-content: stretch
   height: 100%
   width: 100%
+  background-color: rgb(32, 32, 32, 0)
   .scanner
     flex-grow: 0
     flex-shrink: 0
@@ -213,9 +214,9 @@ export default {
     flex-grow: 1
     align-self: stretch
   .icon
-    margin: 12pt
-    width: 40pt
-    height: 40pt
+    margin: 1rem
+    width: 3rem
+    height: 3rem
   .state
     display: flex
     flex-direction: row
@@ -235,24 +236,35 @@ export default {
       .title
         flex-shrink: 0
         flex-grow: 0
-        font-size: 18pt
-        margin-top: 13pt
-        margin-bottom: 11pt
+        font-size: 1.5rem
+        margin-top: 1rem
+        margin-bottom: 0.7rem
         font-weight: bolder
       .description
-        font-size: 10pt
+        font-size: 0.8rem
         flex-grow: 1
   .payload
-    margin: 1em 12pt
+    margin: 1rem 1rem
     flex-grow: 1
   .nerd-stat
     position: fixed
     top: 0
     left: 0
-    margin: 1em 12pt
-    font-size: 9pt
+    margin: 0
+    padding: .5rem 1rem
+    font-size: .75rem
     z-index: 9999
     color: rgba(255, 255, 255, 0.8)
+
+@media screen and (orientation: landscape)
+  .main
+    flex-direction: row
+
+
+@media screen and (min-width: 768px)
+  html
+    font-size: 150%
+
 .stat
   color: white
   transition: background-color .5s
