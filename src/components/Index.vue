@@ -4,8 +4,10 @@
     <Scanner
       @code="handleCode"
       @error="handleCaptureError"
-      @internal-stats="(t, e) => {intTime = t; intError = e}"
+      @internal-stats="val => internalStats = val"
     />
+
+    <NerdView v-if="userIsNerd" :value="internalStats" />
 
     <div :class="['stat', state]">
       <div class="state">
@@ -25,10 +27,6 @@
         身份 <br>
         扫描时间 <br>
       </div>
-      <pre class="nerds" v-if="userIsNerd">You must be a nerd!
-    last: {{ lastResult }}
-    perf: {{ intTime }}ms
-     raw: {{ intError }}</pre>
     </div>
     
   </div>
@@ -36,6 +34,7 @@
 
 <script>
 import Scanner from '@/components/Scanner'
+import NerdView from '@/components/NerdView'
 import 'vue-awesome/icons/spinner'
 import 'vue-awesome/icons/exclamation-circle'
 import 'vue-awesome/icons/question-circle-o'
@@ -49,12 +48,11 @@ import urlParse from 'url-parse'
 
 export default {
   components: {
-    Scanner
+    Scanner,
+    NerdView
   },
   data() {
     return {
-      intTime: null,   // internal stat
-      intError: null,  // internal stat
       lastResult: null,
       lastError: null,
       lastMessage: null,
@@ -63,7 +61,8 @@ export default {
       busy: false,
       toIdleTimeout: null,
       userIsNerd: false,
-      nerdCounter: 0
+      nerdCounter: 0,
+      internalStats: []
     }
   },
   computed: {
@@ -246,9 +245,14 @@ export default {
   .payload
     margin: 1em 12pt
     flex-grow: 1
-  .nerds
+  .nerd-stat
+    position: fixed
+    top: 0
+    left: 0
     margin: 1em 12pt
     font-size: 9pt
+    z-index: 9999
+    color: rgba(255, 255, 255, 0.8)
 .stat
   color: white
   transition: background-color .5s

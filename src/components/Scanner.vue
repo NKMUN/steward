@@ -14,25 +14,10 @@
 </template>
 
 <script>
-import QrWorker from '@/qr.worker.js'
-const qr = new QrWorker()
-qr.startTime = Date.now()
-qr.busy = false
-qr.onmessage = ev => {
-  qr.busy = false
-  const [error, result] = ev.data
-  if (!error && qr.callback) qr.callback(error, result)
-  if (qr.statCallback) qr.statCallback(Date.now() - qr.startTime, error, result)
-}
-qr.decode = imageData => {
-  if (qr.busy) {
-    return false
-  }
-  qr.startTime = Date.now()
-  qr.postMessage(imageData)
-  qr.busy = true
-  return true
-}
+import QR from '@/qr-decode.js'
+import { nop } from '@/qr-decode.js'
+
+const qr = new QR()
 
 export default {
   props: {
@@ -82,8 +67,8 @@ export default {
       this.stream.getVideoTracks().forEach(track => track.stop())
       this.stream = null
       this.$refs.video.srcObject = null
-      qr.callback = () => {}
-      qr.statCallback = () => {}
+      qr.callback = nop
+      qr.statCallback = nop
     },
     handleVideoMeta(ev) {
       // hack for safari's failure to provide height/width in MediaStreamTrack.getSettings()
@@ -99,8 +84,8 @@ export default {
       qr.callback = (err, result) => {
         this.$emit('code', result)
       }
-      qr.statCallback = (time, error) => {
-        this.$emit('internal-stats', time, error)
+      qr.statCallback = (stat, stats, worker) => {
+        this.$emit('internal-stats', stat, stats, worker)
       }
     },
     scanFrame() {
