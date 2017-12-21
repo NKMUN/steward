@@ -236,9 +236,9 @@ export default {
       .title
         flex-shrink: 0
         flex-grow: 0
-        font-size: 1.5rem
+        font-size: 1.3rem
         margin-top: 1rem
-        margin-bottom: 0.7rem
+        margin-bottom: 0
         font-weight: bolder
       .description
         font-size: 0.8rem
@@ -259,7 +259,6 @@ export default {
 @media screen and (orientation: landscape)
   .main
     flex-direction: row
-
 
 @media screen and (min-width: 768px)
   html

@@ -5,7 +5,7 @@
 </template>
 
 <script>
-import "normalize.css"
+import "./typo.css"
 export default {
   name: 'app'
 }
