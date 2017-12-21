@@ -260,6 +260,9 @@ export default {
 @media screen and (orientation: landscape)
   .main
     flex-direction: row
+    .nerd-stat
+      top: initial
+      bottom: 0
 
 @media screen and (min-width: 768px)
   html
