@@ -85,11 +85,11 @@ export default {
       this.lastError = '未能打开摄像头'
       this.lastMessage = error.message
     },
-    async handleCode(qrCode) {
+    async handleCode(payload) {
       // do not scan the same code twice
-      console.log(qrCode)
-      if (qrCode.result === this.lastResult) return
-      this.lastResult = qrCode.result
+      console.log(payload)
+      if (payload === this.lastResult) return
+      this.lastResult = payload
       this.busy = true
       
       // get object unique identifier
@@ -97,7 +97,7 @@ export default {
         hostname,
         pathname,
         query: { auth }
-      } = urlParse(qrCode.result, {})
+      } = urlParse(payload, {})
       console.log(hostname)
       console.log(pathname)
       console.log(auth)
