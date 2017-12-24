@@ -55,6 +55,14 @@ export default {
 
 <style lang="stylus" scoped>
 .nerd-stat
+  position: fixed
+  top: 0
+  left: 0
+  margin: 0
+  padding: .5rem 1rem
+  font-size: .75rem
+  z-index: 9999
+  color: rgba(255, 255, 255, 0.8)
   width: 100%
   max-width: 100%
   background-color: rgba(0, 0, 0, 0.7)

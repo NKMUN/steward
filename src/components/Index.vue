@@ -2,6 +2,7 @@
   <div class="main">
 
     <Scanner
+      ref="scanner"
       @code="handleCode"
       @error="handleCaptureError"
       @internal-stats="val => internalStats = val"
@@ -9,7 +10,7 @@
 
     <NerdView v-if="userIsNerd" :value="internalStats" />
 
-    <div :class="['stat', state]">
+    <div :class="['stat', displayState]">
       <div class="state">
         <Icon
           @touchend.native.prevent="handleNerd"
@@ -18,31 +19,39 @@
           :name="stateIcon"
         />
         <div class="message">
-          <div class="title">{{ lastError || "正在扫描" }}</div>
-          <div class="description">{{ lastMessage || "" }}</div>
+          <div class="title">{{ displayError || "正在扫描" }}</div>
+          <div class="description">{{ displayMessage || "" }}</div>
         </div>
       </div>
+
       <div class="payload">
-        TODO: payload to show <br>
-        姓名 <br>
-        身份 <br>
-        扫描时间 <br>
+        <template v-if="payload">
+          姓名：{{ payload.name }} <br>
+          身份：{{ payload.role.join(', ') }} <br>
+          时间：{{ payload.str_reported_at }} {{ payload.str_conclusion }}
+        </template>
+      </div>
+
+      <div class="status-bar" v-if="token">
+        <EventList v-model="currentEvent" :events="events" />
+        <!-- <button
+          v-if="fullscreenSupported"
+          class="fullscreen"
+          @click="toggleFullscreen"
+        ><Icon name="arrows-alt" /></button> -->
       </div>
     </div>
 
-    <mt-button
-      v-if="fullscreenSupported"
-      type="primary"
-      class="fullscreen"
-      @click="toggleFullscreen"
-    ><Icon name="arrows-alt" /></mt-button>
   </div>
 </template>
 
 <script>
 import Scanner from '@/components/Scanner'
 import NerdView from '@/components/NerdView'
+import EventList from '@/components/EventList'
 import fscreen from 'fscreen'
+import { mapGetters } from 'vuex'
+import dateFormat from 'dateformat'
 import 'vue-awesome/icons/spinner'
 import 'vue-awesome/icons/exclamation-circle'
 import 'vue-awesome/icons/question-circle-o'
@@ -58,7 +67,8 @@ import urlParse from 'url-parse'
 export default {
   components: {
     Scanner,
-    NerdView
+    NerdView,
+    EventList
   },
   data() {
     return {
@@ -71,11 +81,28 @@ export default {
       toIdleTimeout: null,
       userIsNerd: false,
       nerdCounter: 0,
-      internalStats: null
+      nerdSpawning: false,
+      internalStats: null,
+      currentEvent: null,
+      events: []
     }
   },
   computed: {
+    fullscreenSupported() {
+      return fscreen.fullscreenEnabled
+    },
+    ...mapGetters({
+      token: 'token',
+      org: 'org',
+      identifier: 'identifier',
+      expires: 'expires'
+    }),
+    // the following are fuzzy matched for no-token errors
     stateIcon() {
+      if (this.nerdSpawning)
+        return 'frown-o'
+      if (!this.token)
+        return 'exclamation-circle'
       return ({
         idle: 'smile-o',
         error: 'exclamation-circle',
@@ -84,11 +111,16 @@ export default {
         busy: 'spinner',
         forbidden: 'ban',
         uncertain: 'question-circle-o',
-        nerd: 'frown-o',
       })[this.state] || 'meh-o'
     },
-    fullscreenSupported() {
-      return fscreen.fullscreenEnabled
+    displayError() {
+      return this.token || /授权/i.test(this.lastError) ? this.lastError : '尚未取得授权'
+    },
+    displayMessage() {
+      return this.token || /授权/i.test(this.lastError) ? this.lastMessage : '请扫描授权二维码'
+    },
+    displayState() {
+      return this.token ? this.state : 'warning'
     }
   },
   methods: {
@@ -101,6 +133,13 @@ export default {
       // do not scan the same code twice
       console.log(payload)
       if (payload === this.lastResult) return
+      if (!this.currentEvent) {
+        this.state = 'warning'
+        this.lastError = '未选择需签到到活动'
+        this.lastMessage = '点击「当前活动」选择'
+        this.timeoutToIdle()
+      }
+
       this.lastResult = payload
       this.busy = true
 
@@ -108,11 +147,13 @@ export default {
       const {
         hostname,
         pathname,
-        query: { auth }
-      } = urlParse(payload, {})
-      console.log(hostname)
-      console.log(pathname)
-      console.log(auth)
+        query: { auth, preauth }
+      } = urlParse(payload, {}, true)
+
+      if (preauth) {
+        // scanner authorization
+        return this.handleScannerAuthoriaztion(preauth)
+      }
 
       // check identifier conforms to format
       const identifier = pathname.slice(1)
@@ -129,26 +170,36 @@ export default {
           status,
           headers
         } = await this.$agent
-            .post('/api/checkin')
-            .ok( ({ok, status}) => ok || status === 400 )
+            .post(`/api/orgs/${this.org}/events/${this.currentEvent.id}/records/`)
+            .ok( ({ok, status}) => ok || status === 400 || status === 417)
             .set('X-Steward', 'Steward')
             .send({
               identifier,
-              steward: {
-                // TODO: local authorization
-              }
+              auth,
+              steward: this.identifier,
+              extra: {}
             })
         if (ok) {
           this.state = 'success'
+          body.str_reported_at = dateFormat(new Date(body.record.reported_at), 'yyyy-mm-dd HH:MM')
+          body.str_conclusion = body.record.conclusion === 'late'
+                                ? '（迟到）'
+                                : body.record.conclusion === 'absent'
+                                  ? '（缺席）'
+                                  : ''
+          this.payload = body
+          if (status === 200) this.lastError = '签到成功'
+          if (status === 208) this.lastError = '已签过到'
           this.timeoutToIdle()
         } else {
           // TODO: check custom error code
           if (status === 400 && body.error === 'INVALID_AUTHORIZATION') {
             this.state = 'warning'
             this.lastError = '二维码伪造'
+          } else {
+            this.state = 'uncertain'
+            this.lastError = body.message || body.error
           }
-          this.state = 'uncertain'
-          this.lastError = body.message || body.error
           this.timeoutToIdle()
         }
       } catch(e) {
@@ -169,46 +220,86 @@ export default {
         this.lastResult = null
         this.lastMessage = null
         this.toIdleTimeout = null
+        this.payload = null
         if (cbk) cbk()
       }, 5000)
     },
     handleNerd() {
-      if (++this.nerdCounter >= 3) {
-        this.userIsNerd = true
-      }
-      this.state = 'nerd'
-      setTimeout(() => this.state = 'idle', 250)
+      if (++this.nerdCounter >= 3) this.userIsNerd = true
+      this.nerdSpawning = true
+      setTimeout(() => this.nerdSpawning = false, 250)
     },
     toggleFullscreen() {
       if (fscreen.fullscreenElement)
         fscreen.exitFullscreen()
       else
         fscreen.requestFullscreen(document.documentElement)
+    },
+    async validateToken() {
+      if (!this.token) return false
+      // try to validate token online
+      const {
+        ok,
+        status,
+        body
+      } = await this.$agent.get(`/api/orgs/${this.org}/stewards/~`)
+          .ok( ({status, ok}) => ok || status === 403 )
+
+      if (ok) {
+        this.error = 'idle'
+        this.lastMessage = `授权到期：${ dateFormat(this.expires, 'yyyy-mm-dd HH:MM') }`
+        return true
+      }
+      if (status === 403) {
+        this.error = 'warning'
+        this.lastError = '授权已过期'
+        this.lastMessage = '请重新扫描授权二维码'
+        this.$store.commit('token', null)
+        return false
+      }
+    },
+    async fetchEvents() {
+      this.events = await this.$agent.get(`/api/orgs/${this.org}/events/`).body()
+      // guess default event
+      const defaultEvent = this.events
+          .filter( ev => ev.start_at <= Date.now() )
+          .filter( ev => ev.end_at >= Date.now() )
+          .sort( (a, b) => a.start_at - b.start_at )
+          [0]
+      this.currentEvent = defaultEvent
+    },
+    async handleScannerAuthoriaztion(token) {
+      // trade for scanner authorization token
+      try {
+        this.busy = true
+        this.state = 'busy'
+        this.lastError = '正在授权…'
+
+        this.$store.commit('token', token)
+        await this.$agent.get(`/api/orgs/${this.org}/stewards/~`)
+        this.state = 'success'
+        this.lastError = '授权成功'
+        this.lastMessage = `授权到期：${ dateFormat(this.expires, 'yyyy-mm-dd HH:MM') }`
+      } catch(e) {
+        this.state = 'error'
+        this.lastError = '授权失败'
+        this.lastMessage = e.message
+        this.$store.commit('token', null)
+        this.timeoutToIdle()
+      } finally {
+        this.busy = false
+      }
     }
   },
   async mounted() {
-    // const STATES = {
-    //   idle: 'smile-o',
-    //   error: 'exclamation-circle',
-    //   warning: 'exclamation-circle',
-    //   success: 'check-circle',
-    //   busy: 'spinner',
-    //   forbidden: 'ban',
-    //   uncertain: 'question-circle-o',
-    // }
-    // while (true) {
-    //   for (let key in STATES) {
-    //     this.state = key
-    //     this.lastError = key
-    //     this.lastMessage = 'message'
-    //     await new Promise(resolve => setTimeout(resolve, 3000))
-    //   }
-    // }
+    if (await this.validateToken()) {
+      await this.fetchEvents()
+    }
   }
 }
 </script>
 
-<style lang="stylus">
+<style lang="stylus" scoped>
 @keyframes spin {
   from {
     transform: rotate(0)
@@ -231,6 +322,10 @@ export default {
   .stat
     flex-grow: 1
     align-self: stretch
+    display: flex
+    flex-direction: column
+    align-items: stretch
+    justify-content: flex-start
   .icon
     margin: 1rem
     width: 3rem
@@ -264,28 +359,28 @@ export default {
   .payload
     margin: 1rem 1rem
     flex-grow: 1
-  .nerd-stat
-    position: fixed
-    top: 0
-    left: 0
-    margin: 0
-    padding: .5rem 1rem
-    font-size: .75rem
-    z-index: 9999
-    color: rgba(255, 255, 255, 0.8)
-  .fullscreen
-    position: fixed
-    bottom: 0
-    right: 0
-    z-index: 9999
-    height: 24pt
-    width: 24pt
-    text-align: center
-    padding: 0
-    .svg
-      display: inline-block
-      height: 16pt
-      width: 16pt
+  .status-bar
+    display: flex
+    flex-direction: row
+    align-items: center
+    justify-content: flex-start
+    align-self: stretch
+    .event-list
+      flex-grow: 1
+      flex-shrink: 0
+    .fullscreen
+      flex-shrink: 0
+      flex-grow: 0
+      height: 24pt
+      width: 24pt
+      text-align: center
+      padding: 0
+      color: white
+      svg
+        display: inline-block
+        height: 14pt
+        width: 14pt
+        padding: 5pt
 
 @media screen and (orientation: landscape)
   .main
@@ -302,8 +397,9 @@ export default {
     font-size: 150%
 
 .stat
-  color: white
   transition: background-color .5s
+  .payload, .state
+    color: white
   .icon
     transition: color .5s
   &.idle, &.busy
@@ -325,6 +421,4 @@ export default {
     background-color: #67c23a
     .icon
       color: #cbe8b5
-  &.nerd
-    background-color: #333
 </style>

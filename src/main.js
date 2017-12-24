@@ -1,24 +1,28 @@
 import Vue from 'vue'
 import App from './App'
 import router from './router'
-import localforage from 'localforage'
 import superagent from 'superagent'
 import superagentUse from 'superagent-use'
 import Icon from 'vue-awesome/components/Icon'
-
+import store from './store'
 import {
-  Button
+  Button,
+  Cell,
+  Header
 } from 'mint-ui'
-Vue.component( Button.name, Button )
 
 Vue.config.productionTip = false
-
 Vue.component('Icon', Icon)
+Vue.component( Button.name, Button )
+Vue.component( Radio.name, Radio )
+Vue.component( Cell.name, Cell )
+Vue.component( Header.name, Header )
+
+// superagent token injection
 Vue.prototype.$agent = superagentUse(superagent)
 Vue.prototype.$agent.use(req => {
-  // TOOD: in dev, no token
-  // const token = store.getters['user/token']
-  // token && req.auth(token, null, {type: 'bearer'})
+  const token = store.getters.token
+  token && req.auth(token, null, {type: 'bearer'})
 })
 Vue.prototype.$agent.use(req => {
   req.body = () => new Promise((resolve, reject) =>
@@ -34,5 +38,6 @@ Vue.prototype.$agent.use(req => {
 new Vue({
   el: '#app',
   router,
+  store,
   render: h => h(App)
 })
