@@ -63,7 +63,7 @@ export default {
       toIdleTimeout: null,
       userIsNerd: false,
       nerdCounter: 0,
-      internalStats: []
+      internalStats: null
     }
   },
   computed: {
