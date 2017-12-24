@@ -1,6 +1,6 @@
 <template>
-  <div class="scanner">
-    <video class="preview blur" ref="video" @timeupdate="scanFrame" @loadedmetadata="handleVideoMeta"/>
+  <div class="scanner" @click="$refs.file.click()">
+    <video class="preview blur" ref="video" @timeupdate="scanFrame" @loadedmetadata="handleVideoMeta" />
     <svg class="overlay" viewBox="0 0 640 640" shape-rendering="crispEdges">
       <defs>
         <mask id="clip">
@@ -16,6 +16,8 @@
       将二维码放入框内，即可自动扫描
     </div>
     <canvas ref="canvas" />
+    <input ref="file" @change="scanFile" style="display: none" type="file" capture="camera" accept="image/*">
+    <canvas ref="fileCanvas" />
   </div>
 </template>
 
@@ -87,12 +89,40 @@ export default {
       const vMin = Math.min(width, height)
       this.$refs.canvas.height = vMin
       this.$refs.canvas.width = vMin
-      qr.callback = (err, result) => {
-        this.$emit('code', result)
+      qr.callback = (result, location, time) => {
+        this.$emit('code', result, location)
       }
       qr.statCallback = (stat, stats, worker) => {
         this.$emit('internal-stats', stat, stats, worker)
       }
+    },
+    scanFile(ev) {
+      const file = ev.target.files[0]
+      const reader = new FileReader()
+      reader.onload = ev => {
+        const { fileCanvas } = this.$refs
+        let img = new Image();
+        img.src = ev.target.result
+        img.onload = ev => {
+          const {
+            naturalWidth: width,
+            naturalHeight: height
+          } = img
+          fileCanvas.width = width
+          fileCanvas.height = height
+          const ctx = fileCanvas.getContext('2d')
+          ctx.drawImage(img, 0, 0)
+          // try to decode until queued
+          if (!qr.decode(ctx.getImageData(0, 0, width, height))) {
+            const itvl = setInterval(() => {
+              const ret = qr.decode(ctx.getImageData(0, 0, width, height))
+              if (ret) clearInterval(itvl)
+            }, 100)
+          }
+          this.$refs.file.value = ''
+        }
+      }
+      reader.readAsDataURL(file)
     },
     scanFrame() {
       // compute qr code capture area
