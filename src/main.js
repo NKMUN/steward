@@ -6,6 +6,11 @@ import superagent from 'superagent'
 import superagentUse from 'superagent-use'
 import Icon from 'vue-awesome/components/Icon'
 
+import {
+  Button
+} from 'mint-ui'
+Vue.component( Button.name, Button )
+
 Vue.config.productionTip = false
 
 Vue.component('Icon', Icon)
@@ -17,10 +22,10 @@ Vue.prototype.$agent.use(req => {
 })
 Vue.prototype.$agent.use(req => {
   req.body = () => new Promise((resolve, reject) =>
-      req.then(
-          res => resolve(res.body),
-          reject
-      )
+    req.then(
+      res => resolve(res.body),
+      reject
+    )
   )
   req.blob = () => req.responseType('blob').body()
 })

@@ -30,12 +30,19 @@
       </div>
     </div>
 
+    <mt-button
+      v-if="fullscreenSupported"
+      type="primary"
+      class="fullscreen"
+      @click="toggleFullscreen"
+    ><Icon name="arrows-alt" /></mt-button>
   </div>
 </template>
 
 <script>
 import Scanner from '@/components/Scanner'
 import NerdView from '@/components/NerdView'
+import fscreen from 'fscreen'
 import 'vue-awesome/icons/spinner'
 import 'vue-awesome/icons/exclamation-circle'
 import 'vue-awesome/icons/question-circle-o'
@@ -44,6 +51,7 @@ import 'vue-awesome/icons/ban'
 import 'vue-awesome/icons/smile-o'
 import 'vue-awesome/icons/meh-o'
 import 'vue-awesome/icons/frown-o'
+import 'vue-awesome/icons/arrows-alt'
 
 import urlParse from 'url-parse'
 
@@ -78,6 +86,9 @@ export default {
         uncertain: 'question-circle-o',
         nerd: 'frown-o',
       })[this.state] || 'meh-o'
+    },
+    fullscreenSupported() {
+      return fscreen.fullscreenEnabled
     }
   },
   methods: {
@@ -168,6 +179,12 @@ export default {
       this.state = 'nerd'
       setTimeout(() => this.state = 'idle', 250)
     },
+    toggleFullscreen() {
+      if (fscreen.fullscreenElement)
+        fscreen.exitFullscreen()
+      else
+        fscreen.requestFullscreen(document.documentElement)
+    }
   },
   async mounted() {
     // const STATES = {
@@ -256,6 +273,19 @@ export default {
     font-size: .75rem
     z-index: 9999
     color: rgba(255, 255, 255, 0.8)
+  .fullscreen
+    position: fixed
+    bottom: 0
+    right: 0
+    z-index: 9999
+    height: 24pt
+    width: 24pt
+    text-align: center
+    padding: 0
+    .svg
+      display: inline-block
+      height: 16pt
+      width: 16pt
 
 @media screen and (orientation: landscape)
   .main
@@ -263,6 +293,9 @@ export default {
     .nerd-stat
       top: initial
       bottom: 0
+    .fullscreen
+      top: 0
+      bottom: initial
 
 @media screen and (min-width: 768px)
   html

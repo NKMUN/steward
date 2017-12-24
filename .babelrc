@@ -2,6 +2,12 @@
   "presets": [],
   "plugins": [
     "transform-vue-jsx",
-    "transform-object-rest-spread"
+    "transform-object-rest-spread",
+    ["component", [
+      {
+        "libraryName": "mint-ui",
+        "style": true
+      }
+    ]]
   ]
 }
