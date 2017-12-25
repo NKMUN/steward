@@ -30,7 +30,9 @@ export default {
     value: { type: Object }
   },
   render(h, ctx) {
-    if (!ctx.props.value) return (<pre>No stats available</pre>)
+    if (!ctx.props.value) return (
+      <pre class="nerd-stat">No stats available</pre>
+    )
 
     const {
       freqMs,
