@@ -62,8 +62,6 @@ import 'vue-awesome/icons/meh-o'
 import 'vue-awesome/icons/frown-o'
 import 'vue-awesome/icons/arrows-alt'
 
-import urlParse from 'url-parse'
-
 export default {
   components: {
     Scanner,
@@ -133,88 +131,19 @@ export default {
       if (payload === this.lastResult) return
       this.lastResult = payload
 
-      if (!this.currentEvent) {
+      if (/^[NP]\//.test(payload)) {
+        // support for "mysterious code" style
+        if (payload[0] === 'N') return this.handleNormalCode(payload.slice(2))
+        if (payload[0] === 'P') return this.handleScannerAuthoriaztion(payload.slice(2))
+      } else if (/http(s?):\/\//i.test(payload)) {
+        // legacy url code
+        const n = /\/([a-zA-Z0-9_\-]+)(?:\?|$)/.exec(payload)
+        const p = /\?(?:.*?)preauth=([a-zA-Z\.0-9_+\/\-]+)(?:&|$)/.exec(payload)
+        if (n) return this.handleNormalCode(n[1])
+        if (p) return this.handleScannerAuthoriaztion(p[1])
+      } else {
         this.state = 'warning'
-        this.lastError = '未选择需签到到活动'
-        this.lastMessage = '点击「当前活动」选择'
-        this.timeoutToIdle()
-        return
-      }
-
-      // get object unique identifier
-      const {
-        hostname,    // not used, may be used to check against domain name
-        pathname,
-        query: { preauth }
-      } = urlParse(payload, {}, true)
-
-      // check for scanner authorization
-      if (preauth) {
-        return this.handleScannerAuthoriaztion(preauth)
-      }
-
-      // check identifier conforms to format
-      const identifier = pathname.slice(1)
-      if (!/[a-zA-Z0-9_\-\.]+/.test(identifier)) {
-        this.state = 'uncertain'
-        this.lastError = '二维码无效'
-        this.timeoutToIdle()
-        return
-      }
-
-      if (!this.currentEvent) {
-        this.state = 'warning'
-        this.lastError = '未选择活动'
-        this.lastMessage = '请先选择当前活动'
-        return
-      }
-
-      this.state = 'busy'
-      try {
-        const {
-          body,
-          ok,
-          status
-        } = await this.$agent
-            .post(`/api/orgs/${this.org}/events/${this.currentEvent.id}/records/`)
-            .ok( ({ok, status}) => ok || status === 417 || status === 404)
-            .set('X-Steward', 'Steward')
-            .send({
-              identifier,
-              steward: this.identifier,
-              extra: {}
-            })
-        if (ok) {
-          this.state = 'success'
-          body.str_reported_at = dateFormat(new Date(body.record.reported_at), 'yyyy-mm-dd HH:MM')
-          body.str_conclusion = body.record.conclusion === 'late'
-                                ? '（迟到）'
-                                : body.record.conclusion === 'absent'
-                                  ? '（缺席）'
-                                  : ''
-          this.payload = body
-          if (status === 200) this.lastError = '签到成功'
-          if (status === 208) this.lastError = '已签过到'
-        } else if (status === 417 && body.error === 'EVENT_NOT_STARTED') {
-          this.state = 'warning'
-          this.lastError = '活动尚未开始'
-        } else if (status === 417 && body.error === 'EVENT_HAS_ENDED') {
-          this.state = 'warning'
-          this.lastError = '活动已结束'
-        } else if (status === 404 && body.error === 'OBJECT_NOT_FOUND') {
-          this.state = 'error'
-          this.lastError = '二维码无效'
-        } else {
-          this.state = 'uncertain'
-          this.lastError = body.message || body.error
-        }
-      } catch(e) {
-        console.log(e)
-        this.state = 'error'
-        this.lastError = '通信故障'
-        this.lastMessage = e.message
-      } finally {
-        this.timeoutToIdle()
+        this.lastError = '无效二维码'
       }
     },
     timeoutToIdle(cbk) {
@@ -270,6 +199,71 @@ export default {
         return false
       }
     },
+    async handleNormalCode(identifier) {
+      // check identifier conforms to format
+      if (!/[a-zA-Z0-9_\-\.]+/.test(identifier)) {
+        this.state = 'uncertain'
+        this.lastError = '二维码无效'
+        this.timeoutToIdle()
+        return
+      }
+
+      if (!this.currentEvent) {
+        this.state = 'warning'
+        this.lastError = '未选择需签到到活动'
+        this.lastMessage = '点击「当前活动」选择'
+        this.timeoutToIdle()
+        return
+      }
+
+      this.state = 'busy'
+      try {
+        const {
+          body,
+          ok,
+          status
+        } = await this.$agent
+            .post(`/api/orgs/${this.org}/events/${this.currentEvent.id}/records/`)
+            .ok( ({ok, status}) => ok || status === 417 || status === 404)
+            .set('X-Steward', 'Steward')
+            .send({
+              identifier,
+              steward: this.identifier,
+              extra: {}
+            })
+        if (ok) {
+          this.state = 'success'
+          body.str_reported_at = dateFormat(new Date(body.record.reported_at), 'yyyy-mm-dd HH:MM')
+          body.str_conclusion = body.record.conclusion === 'late'
+                                ? '（迟到）'
+                                : body.record.conclusion === 'absent'
+                                  ? '（缺席）'
+                                  : ''
+          this.payload = body
+          if (status === 200) this.lastError = '签到成功'
+          if (status === 208) this.lastError = '已签过到'
+        } else if (status === 417 && body.error === 'EVENT_NOT_STARTED') {
+          this.state = 'warning'
+          this.lastError = '活动尚未开始'
+        } else if (status === 417 && body.error === 'EVENT_HAS_ENDED') {
+          this.state = 'warning'
+          this.lastError = '活动已结束'
+        } else if (status === 404 && body.error === 'OBJECT_NOT_FOUND') {
+          this.state = 'error'
+          this.lastError = '二维码无效'
+        } else {
+          this.state = 'uncertain'
+          this.lastError = body.message || body.error
+        }
+      } catch(e) {
+        console.log(e)
+        this.state = 'error'
+        this.lastError = '通信故障'
+        this.lastMessage = e.message
+      } finally {
+        this.timeoutToIdle()
+      }
+    },
     async handleScannerAuthoriaztion(token) {
       // trade for scanner authorization token
       try {
@@ -277,12 +271,19 @@ export default {
         this.lastError = '正在授权…'
 
         this.$store.commit('token', token)
-        await this.$agent.get(`/api/orgs/${this.org}/stewards/~`)
-
-        this.state = 'success'
-        this.lastError = '授权成功'
-        this.lastMessage = `授权到期：${ dateFormat(this.expires, 'yyyy-mm-dd HH:MM') }`
-        this.toIdleTimeout && clearTimeout(this.toIdleTimeout)
+        const {
+          ok,
+          body
+        } = await this.$agent.get(`/api/orgs/${this.org}/stewards/~`)
+            .ok(({ok, status}) => ok || status === 401)
+        if (ok) {
+          this.state = 'success'
+          this.lastError = '授权成功'
+          this.lastMessage = `授权到期：${ dateFormat(this.expires, 'yyyy-mm-dd HH:MM') }`
+          this.toIdleTimeout && clearTimeout(this.toIdleTimeout)
+        } else {
+          throw new Error(body.error)
+        }
       } catch(e) {
         this.state = 'error'
         this.lastError = '授权失败'
