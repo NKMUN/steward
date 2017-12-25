@@ -4909,10 +4909,6 @@ typedarray@^0.0.6:
   version "0.0.6"
   resolved "https://registry.npmjs.org/typedarray/-/typedarray-0.0.6.tgz#867ac74e3864187b1d3d47d996a78ec5c8830777"
 
-typocss@^1.4.0:
-  version "1.4.0"
-  resolved "https://registry.npmjs.org/typocss/-/typocss-1.4.0.tgz#69f3b497694d3d09b6197a0ba47ee006a91534ba"
-
 uglify-es@^3.2.1:
   version "3.2.2"
   resolved "https://registry.npmjs.org/uglify-es/-/uglify-es-3.2.2.tgz#15c62b7775002c81b7987a1c49ecd3f126cace73"

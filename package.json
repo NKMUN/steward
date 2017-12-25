@@ -10,9 +10,7 @@
     "build": "node build/build.js"
   },
   "dependencies": {
-    "jsqr": "^0.2.2",
     "vue": "^2.5.2",
-    "vue-awesome": "^2.3.4",
     "vue-router": "^3.0.1"
   },
   "devDependencies": {
@@ -36,6 +34,7 @@
     "friendly-errors-webpack-plugin": "^1.6.1",
     "fscreen": "^1.0.2",
     "html-webpack-plugin": "^2.30.1",
+    "jsqr": "^0.2.2",
     "jwt-decode": "^2.2.0",
     "mint-ui": "^2.2.13",
     "node-notifier": "^5.1.2",
@@ -52,10 +51,10 @@
     "stylus-loader": "^3.0.1",
     "superagent": "^3.8.2",
     "superagent-use": "^0.1.0",
-    "typocss": "^1.4.0",
     "uglifyjs-webpack-plugin": "^1.1.1",
     "url-loader": "^0.5.8",
     "url-parse": "^1.2.0",
+    "vue-awesome": "^2.3.4",
     "vue-loader": "^13.3.0",
     "vue-style-loader": "^3.0.1",
     "vue-template-compiler": "^2.5.2",
