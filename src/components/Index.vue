@@ -282,6 +282,7 @@ export default {
         this.state = 'success'
         this.lastError = '授权成功'
         this.lastMessage = `授权到期：${ dateFormat(this.expires, 'yyyy-mm-dd HH:MM') }`
+        this.toIdleTimeout && clearTimeout(this.toIdleTimeout)
       } catch(e) {
         this.state = 'error'
         this.lastError = '授权失败'

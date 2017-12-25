@@ -1,5 +1,8 @@
 <template>
   <div class="scanner" @click="$refs.file.click()">
+    <button v-if="!autoStartCapture" class="debug auto-capture" @click.stop="handleAutoCapture">
+      <Icon name="bug" />
+    </button>
     <video class="preview blur" ref="video" @timeupdate="scanFrame" @loadedmetadata="handleVideoMeta" />
     <svg class="overlay" viewBox="0 0 640 640" shape-rendering="crispEdges">
       <defs>
@@ -24,6 +27,9 @@
 <script>
 import QR from '@/qr-decode.js'
 import { nop } from '@/qr-decode.js'
+import 'vue-awesome/icons/bug'
+
+const DEV_AUTO_CAPTURE_KEY = 'dev/no-auto-capture'
 
 const qr = new QR()
 
@@ -44,7 +50,8 @@ export default {
   },
   data() {
     return {
-      stream: null
+      stream: null,
+      autoStartCapture: !window.localStorage || !window.localStorage.getItem(DEV_AUTO_CAPTURE_KEY)
     }
   },
   methods: {
@@ -89,12 +96,6 @@ export default {
       const vMin = Math.min(width, height)
       this.$refs.canvas.height = vMin
       this.$refs.canvas.width = vMin
-      qr.callback = (result, location, time) => {
-        this.$emit('code', result, location)
-      }
-      qr.statCallback = (stat, stats, worker) => {
-        this.$emit('internal-stats', stat, stats, worker)
-      }
     },
     scanFile(ev) {
       const file = ev.target.files[0]
@@ -146,6 +147,10 @@ export default {
       const ctx = canvas.getContext('2d')
       ctx.drawImage(video, startX, startY, scanX, scanY, 0, 0, cW, cH)
       qr.decode(ctx.getImageData(0, 0, cW, cH))
+    },
+    handleAutoCapture() {
+      this.autoStartCapture = true
+      this.startCapture()
     }
   },
   mounted() {
@@ -156,10 +161,17 @@ export default {
         this.$emit('document:hidden')
       }
     })
-    this.$on('document:visible', () => { this.startCapture() })
+    this.$on('document:visible', () => { this.autoStartCapture && this.startCapture() })
     this.$on('document:hidden', () => { this.stopCapture() })
 
-    this.startCapture()
+    this.autoStartCapture && this.startCapture()
+
+    qr.callback = (result, location, time) => {
+      this.$emit('code', result, location)
+    }
+    qr.statCallback = (stat, stats, worker) => {
+      this.$emit('internal-stats', stat, stats, worker)
+    }
   },
   beforeDestroy() {
     this.stopCapture()
@@ -226,6 +238,21 @@ export default {
     rgba(30,87,153,0) 100%
   )
   animation: 2s ease-in-out 0s infinite alternate both running bar-scan
+.debug.auto-capture
+  position: absolute
+  bottom: 0
+  left: 0
+  width: 10vmin
+  height: 10vmin
+  min-width: 24pt
+  min-height: 24pt
+  max-width: 48pt
+  max-height: 48pt
+  text-align: center
+  vertical-align: middle
+  color: white
+  background-color: black
+  z-index: 999
 canvas
   display: none
 @media screen and (orientation: portrait)
