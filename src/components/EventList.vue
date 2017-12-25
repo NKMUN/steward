@@ -96,7 +96,7 @@ export default {
             [0]
         this.$emit('input', defaultEvent)
       }
-      this.$refs.loadmore.onTopLoaded()
+      this.$refs.loadmore && this.$refs.loadmore.onTopLoaded()
     },
     handleSelection(val) {
       this.events.findOne(ev => ev.id === val)

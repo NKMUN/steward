@@ -8,7 +8,7 @@
       @internal-stats="val => internalStats = val"
     />
 
-    <NerdView v-if="userIsNerd" :value="internalStats" />
+    <NerdView v-if="nerdCounter >= 3" :value="internalStats" />
 
     <div :class="['stat', displayState]">
       <div class="state">
@@ -75,11 +75,9 @@ export default {
       lastResult: null,
       lastError: null,
       lastMessage: null,
-      payload: null,    // things to shown on screen
+      payload: null,    // things to show on screen
       state: 'idle',
-      busy: false,
       toIdleTimeout: null,
-      userIsNerd: false,
       nerdCounter: 0,
       nerdSpawning: false,
       internalStats: null,
@@ -129,37 +127,39 @@ export default {
       this.lastMessage = error.message
     },
     async handleCode(payload) {
-      // do not scan the same code twice
       console.log(payload)
+
+      // do not scan the same code twice
       if (payload === this.lastResult) return
+      this.lastResult = payload
+
       if (!this.currentEvent) {
         this.state = 'warning'
         this.lastError = '未选择需签到到活动'
         this.lastMessage = '点击「当前活动」选择'
         this.timeoutToIdle()
+        return
       }
-
-      this.lastResult = payload
-      this.busy = true
 
       // get object unique identifier
       const {
-        hostname,
+        hostname,    // not used, may be used to check against domain name
         pathname,
         query: { preauth }
       } = urlParse(payload, {}, true)
 
+      // check for scanner authorization
       if (preauth) {
-        // scanner authorization
         return this.handleScannerAuthoriaztion(preauth)
       }
 
       // check identifier conforms to format
       const identifier = pathname.slice(1)
-      if (!/[a-zA-Z0-9\.]+/.test(identifier)) {
+      if (!/[a-zA-Z0-9_\-\.]+/.test(identifier)) {
         this.state = 'uncertain'
         this.lastError = '二维码无效'
         this.timeoutToIdle()
+        return
       }
 
       if (!this.currentEvent) {
@@ -169,12 +169,12 @@ export default {
         return
       }
 
+      this.state = 'busy'
       try {
         const {
           body,
           ok,
-          status,
-          headers
+          status
         } = await this.$agent
             .post(`/api/orgs/${this.org}/events/${this.currentEvent.id}/records/`)
             .ok( ({ok, status}) => ok || status === 417 || status === 404)
@@ -195,31 +195,26 @@ export default {
           this.payload = body
           if (status === 200) this.lastError = '签到成功'
           if (status === 208) this.lastError = '已签过到'
-          this.timeoutToIdle()
+        } else if (status === 417 && body.error === 'EVENT_NOT_STARTED') {
+          this.state = 'warning'
+          this.lastError = '活动尚未开始'
+        } else if (status === 417 && body.error === 'EVENT_HAS_ENDED') {
+          this.state = 'warning'
+          this.lastError = '活动已结束'
+        } else if (status === 404 && body.error === 'OBJECT_NOT_FOUND') {
+          this.state = 'error'
+          this.lastError = '二维码无效'
         } else {
-          if (status === 417 && body.error === 'EVENT_NOT_STARTED') {
-            this.state = 'warning'
-            this.lastError = '活动尚未开始'
-          } else if (status === 417 && body.error === 'EVENT_HAS_ENDED') {
-            this.state = 'warning'
-            this.lastError = '活动已结束'
-          } else if (status === 404 && body.error === 'OBJECT_NOT_FOUND') {
-            this.state = 'error'
-            this.lastError = '二维码无效'
-          } else {
-            this.state = 'uncertain'
-            this.lastError = body.message || body.error
-          }
-          this.timeoutToIdle()
+          this.state = 'uncertain'
+          this.lastError = body.message || body.error
         }
       } catch(e) {
         console.log(e)
+        this.state = 'error'
         this.lastError = '通信故障'
         this.lastMessage = e.message
-        this.state = 'error'
-        this.timeoutToIdle()
       } finally {
-        this.busy = false
+        this.timeoutToIdle()
       }
     },
     timeoutToIdle(cbk) {
@@ -235,7 +230,7 @@ export default {
       }, 5000)
     },
     handleNerd() {
-      if (++this.nerdCounter >= 3) this.userIsNerd = true
+      this.nerdCounter += 1
       this.nerdSpawning = true
       setTimeout(() => this.nerdSpawning = false, 250)
     },
@@ -248,35 +243,42 @@ export default {
     async validateToken() {
       if (!this.token) return false
       // try to validate token online
-      const {
-        ok,
-        status,
-        body
-      } = await this.$agent.get(`/api/orgs/${this.org}/stewards/~`)
-          .ok( ({status, ok}) => ok || status === 403 )
+      try {
+        const {
+          ok,
+          status,
+          body
+        } = await this.$agent.get(`/api/orgs/${this.org}/stewards/~`)
+            .ok( ({status, ok}) => ok || status === 403 )
 
-      if (ok) {
-        this.error = 'idle'
-        this.lastMessage = `授权到期：${ dateFormat(this.expires, 'yyyy-mm-dd HH:MM') }`
-        return true
-      }
-      if (status === 403) {
-        this.error = 'warning'
-        this.lastError = '授权已过期'
-        this.lastMessage = '请重新扫描授权二维码'
-        this.$store.commit('token', null)
+        if (ok) {
+          this.state = 'idle'
+          this.lastMessage = `授权到期：${ dateFormat(this.expires, 'yyyy-mm-dd HH:MM') }`
+          return true
+        }
+        if (status === 403) {
+          this.state = 'warning'
+          this.lastError = '授权已过期'
+          this.lastMessage = '请重新扫描授权二维码'
+          this.$store.commit('token', null)
+          return false
+        }
+      } catch(e) {
+        this.state = 'error'
+        this.lastError = '通信故障'
+        this.lastMessage = e.message
         return false
       }
     },
     async handleScannerAuthoriaztion(token) {
       // trade for scanner authorization token
       try {
-        this.busy = true
         this.state = 'busy'
         this.lastError = '正在授权…'
 
         this.$store.commit('token', token)
         await this.$agent.get(`/api/orgs/${this.org}/stewards/~`)
+
         this.state = 'success'
         this.lastError = '授权成功'
         this.lastMessage = `授权到期：${ dateFormat(this.expires, 'yyyy-mm-dd HH:MM') }`
@@ -286,8 +288,6 @@ export default {
         this.lastMessage = e.message
         this.$store.commit('token', null)
         this.timeoutToIdle()
-      } finally {
-        this.busy = false
       }
     }
   },
