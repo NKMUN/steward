@@ -147,7 +147,7 @@ export default {
       const {
         hostname,
         pathname,
-        query: { auth, preauth }
+        query: { preauth }
       } = urlParse(payload, {}, true)
 
       if (preauth) {
@@ -171,11 +171,10 @@ export default {
           headers
         } = await this.$agent
             .post(`/api/orgs/${this.org}/events/${this.currentEvent.id}/records/`)
-            .ok( ({ok, status}) => ok || status === 400 || status === 417)
+            .ok( ({ok, status}) => ok || status === 417 || status === 404)
             .set('X-Steward', 'Steward')
             .send({
               identifier,
-              auth,
               steward: this.identifier,
               extra: {}
             })
@@ -192,10 +191,15 @@ export default {
           if (status === 208) this.lastError = '已签过到'
           this.timeoutToIdle()
         } else {
-          // TODO: check custom error code
-          if (status === 400 && body.error === 'INVALID_AUTHORIZATION') {
+          if (status === 417 && body.error === 'EVENT_NOT_STARTED') {
             this.state = 'warning'
-            this.lastError = '二维码伪造'
+            this.lastError = '活动尚未开始'
+          } else if (status === 417 && body.error === 'EVENT_HAS_ENDED') {
+            this.state = 'warning'
+            this.lastError = '活动已结束'
+          } else if (status === 404 && body.error === 'OBJECT_NOT_FOUND') {
+            this.state = 'error'
+            this.lastError = '二维码无效'
           } else {
             this.state = 'uncertain'
             this.lastError = body.message || body.error
