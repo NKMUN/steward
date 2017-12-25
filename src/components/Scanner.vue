@@ -53,12 +53,13 @@ export default {
       stream: null,
       itvl: null,
       error: null,
-      autoStartCapture: !window.localStorage || !window.localStorage.getItem(DEV_AUTO_CAPTURE_KEY)
+      autoStartCapture: !window.localStorage || !window.localStorage.getItem(DEV_AUTO_CAPTURE_KEY),
+      supportRealtime: !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia
     }
   },
   methods: {
     handleClick() {
-      if (!this.autoStartCapture) {
+      if (!this.autoStartCapture || !this.supportRealtime) {
         this.$refs.file.click()
       } else {
         this.stopCapture()
@@ -66,6 +67,10 @@ export default {
       }
     },
     startCapture() {
+      if (!this.supportRealtime) {
+        this.error = '浏览器不支持实时采集，请点击扫描框拍照扫描'
+        return
+      }
       navigator.mediaDevices.getUserMedia({
         video: {
           width: { ideal: 1280 },
@@ -119,6 +124,7 @@ export default {
       this.$emit('started')
     },
     scanFile(ev) {
+      this.error = '正在识别……'
       const file = ev.target.files[0]
       const reader = new FileReader()
       reader.onload = ev => {
@@ -130,14 +136,19 @@ export default {
             naturalWidth: width,
             naturalHeight: height
           } = img
-          fileCanvas.width = width
-          fileCanvas.height = height
+          // shrink image
+          const iMax = Math.max(width, height)
+          const scale = Math.min(1280 / iMax, 1)
+          const cWidth = Math.floor(width * scale)
+          const cHeight = Math.floor(height * scale)
+          fileCanvas.width = cWidth
+          fileCanvas.height = cHeight
           const ctx = fileCanvas.getContext('2d')
-          ctx.drawImage(img, 0, 0)
+          ctx.drawImage(img, 0, 0, cWidth, cHeight)
           // try to decode until queued
-          if (!qr.decode(ctx.getImageData(0, 0, width, height))) {
+          if (!qr.decode(ctx.getImageData(0, 0, cWidth, cHeight))) {
             const itvl = setInterval(() => {
-              const ret = qr.decode(ctx.getImageData(0, 0, width, height))
+              const ret = qr.decode(ctx.getImageData(0, 0, cWidth, cHeight))
               if (ret) clearInterval(itvl)
             }, 100)
           }
@@ -190,8 +201,13 @@ export default {
     qr.callback = (result, location, time) => {
       this.$emit('code', result, location)
     }
-    qr.statCallback = (stat, stats, worker) => {
-      this.$emit('internal-stats', stat, stats, worker)
+    qr.statCallback = (stat) => {
+      if (!this.supportRealtime) {
+        const { error } = stat.workers.find($ => $.emitting)
+        if (error) this.error = '未能识别：' + error
+        else this.error = '识别成功'
+      }
+      this.$emit('internal-stats', stat)
     }
   },
   beforeDestroy() {
