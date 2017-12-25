@@ -1,7 +1,7 @@
 import QrWorker from '@/qr2.worker.js'
 
 // Safari does not support hardwareConcurrency, assume 4 cores and consume as many as possible
-const availableCores = Math.max((navigator.hardwareConcurrency || 4) - 2, 1)
+const availableCores = Math.min(Math.max((navigator.hardwareConcurrency || 4) - 2, 1), 4)
 const nop = () => {}
 
 /*
