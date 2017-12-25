@@ -33,7 +33,7 @@
       </div>
 
       <div class="status-bar" v-if="token">
-        <EventList v-model="currentEvent" :events="events" />
+        <EventList v-model="currentEvent" />
         <!-- <button
           v-if="fullscreenSupported"
           class="fullscreen"
@@ -84,7 +84,6 @@ export default {
       nerdSpawning: false,
       internalStats: null,
       currentEvent: null,
-      events: []
     }
   },
   computed: {
@@ -161,6 +160,13 @@ export default {
         this.state = 'uncertain'
         this.lastError = '二维码无效'
         this.timeoutToIdle()
+      }
+
+      if (!this.currentEvent) {
+        this.state = 'warning'
+        this.lastError = '未选择活动'
+        this.lastMessage = '请先选择当前活动'
+        return
       }
 
       try {
@@ -262,16 +268,6 @@ export default {
         return false
       }
     },
-    async fetchEvents() {
-      this.events = await this.$agent.get(`/api/orgs/${this.org}/events/`).body()
-      // guess default event
-      const defaultEvent = this.events
-          .filter( ev => ev.start_at <= Date.now() )
-          .filter( ev => ev.end_at >= Date.now() )
-          .sort( (a, b) => a.start_at - b.start_at )
-          [0]
-      this.currentEvent = defaultEvent
-    },
     async handleScannerAuthoriaztion(token) {
       // trade for scanner authorization token
       try {
@@ -296,9 +292,7 @@ export default {
     }
   },
   async mounted() {
-    if (await this.validateToken()) {
-      await this.fetchEvents()
-    }
+    await this.validateToken()
   }
 }
 </script>

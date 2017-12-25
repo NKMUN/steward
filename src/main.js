@@ -8,15 +8,16 @@ import store from './store'
 import {
   Button,
   Cell,
-  Header
+  Header,
+  Loadmore
 } from 'mint-ui'
 
 Vue.config.productionTip = false
 Vue.component('Icon', Icon)
 Vue.component( Button.name, Button )
-Vue.component( Radio.name, Radio )
 Vue.component( Cell.name, Cell )
 Vue.component( Header.name, Header )
+Vue.component( Loadmore.name, Loadmore )
 
 // superagent token injection
 Vue.prototype.$agent = superagentUse(superagent)
