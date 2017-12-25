@@ -5,6 +5,7 @@
       ref="scanner"
       @code="handleCode"
       @error="handleCaptureError"
+      @started="handleCaptureStart"
       @internal-stats="val => internalStats = val"
     />
 
@@ -124,8 +125,16 @@ export default {
       this.lastError = '未能打开摄像头'
       this.lastMessage = error.message
     },
+    handleCaptureStart() {
+      if (this.state === 'error') {
+        this.state = 'idle'
+        this.lastError = ''
+        this.lastMessage = ''
+      }
+    },
     async handleCode(payload) {
       console.log(payload)
+      if (!payload) return
 
       // do not scan the same code twice
       if (payload === this.lastResult) return

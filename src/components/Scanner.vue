@@ -1,9 +1,9 @@
 <template>
-  <div class="scanner" @click="$refs.file.click()">
+  <div class="scanner" @click.stop="handleClick()">
     <button v-if="!autoStartCapture" class="debug auto-capture" @click.stop="handleAutoCapture">
       <Icon name="bug" />
     </button>
-    <video class="preview blur" ref="video" @timeupdate="scanFrame" @loadedmetadata="handleVideoMeta" />
+    <video class="preview blur" ref="video" @loadedmetadata="handleVideoMeta" />
     <svg class="overlay" viewBox="0 0 640 640" shape-rendering="crispEdges">
       <defs>
         <mask id="clip">
@@ -16,7 +16,7 @@
     </svg>
     <div class="bar" v-if="Boolean(stream)"></div>
     <div class="hint">
-      将二维码放入框内，即可自动扫描
+      {{ stream ? "将二维码放入框内，即可自动扫描" : error || "摄像头已关闭" }}
     </div>
     <canvas ref="canvas" />
     <input ref="file" @change="scanFile" style="display: none" type="file" capture="camera" accept="image/*">
@@ -51,16 +51,26 @@ export default {
   data() {
     return {
       stream: null,
+      itvl: null,
+      error: null,
       autoStartCapture: !window.localStorage || !window.localStorage.getItem(DEV_AUTO_CAPTURE_KEY)
     }
   },
   methods: {
+    handleClick() {
+      if (!this.autoStartCapture) {
+        this.$refs.file.click()
+      } else {
+        this.stopCapture()
+        this.startCapture()
+      }
+    },
     startCapture() {
       navigator.mediaDevices.getUserMedia({
         video: {
-          width: { min: 1280, ideal: 1080 },
-          height: { min: 720, ideal: 1920 },
-          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: { ideal: 'environment' },
           ... this.constraint
         }
       }).then(
@@ -69,6 +79,14 @@ export default {
           this.stream = stream
           this.$refs.video.srcObject = stream
           this.$refs.video.play()
+          this.itvl = setInterval(() => this.scanFrame(), 250)
+          this.stream.getTracks()[0].onended = () => {
+            this.error = "摄像头已关闭，点击扫描框重新开始扫描"
+            this.stopCapture()
+          }
+          this.state = 'idle'
+          this.lastError = '正在扫描'
+          this.lastMessage = ''
         },
         error => {
           this.$emit('error', error)
@@ -79,11 +97,13 @@ export default {
     },
     stopCapture() {
       if (!this.stream) return
-      this.stream.getVideoTracks().forEach(track => track.stop())
+      clearInterval(this.itvl)
+      this.stream.getTracks().forEach(track => {
+        track.stop()
+        this.stream.removeTrack && this.stream.removeTrack(track)
+      })
       this.stream = null
       this.$refs.video.srcObject = null
-      qr.callback = nop
-      qr.statCallback = nop
     },
     handleVideoMeta(ev) {
       // hack for safari's failure to provide height/width in MediaStreamTrack.getSettings()
@@ -96,6 +116,7 @@ export default {
       const vMin = Math.min(width, height)
       this.$refs.canvas.height = vMin
       this.$refs.canvas.width = vMin
+      this.$emit('started')
     },
     scanFile(ev) {
       const file = ev.target.files[0]
