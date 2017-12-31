@@ -54,7 +54,7 @@ export default {
       itvl: null,
       error: null,
       autoStartCapture: !window.localStorage || !window.localStorage.getItem(DEV_AUTO_CAPTURE_KEY),
-      supportRealtime: !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia
+      supportRealtime: navigator.mediaDevices && navigator.mediaDevices.getUserMedia
     }
   },
   methods: {
