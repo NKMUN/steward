@@ -62,6 +62,7 @@ import 'vue-awesome/icons/smile-o'
 import 'vue-awesome/icons/meh-o'
 import 'vue-awesome/icons/frown-o'
 import 'vue-awesome/icons/arrows-alt'
+import FP2 from 'fingerprintjs2'
 
 export default {
   components: {
@@ -81,6 +82,7 @@ export default {
       nerdSpawning: false,
       internalStats: null,
       currentEvent: null,
+      fingerprint: ''
     }
   },
   computed: {
@@ -238,7 +240,9 @@ export default {
             .send({
               identifier,
               steward: this.identifier,
-              extra: {}
+              extra: {
+                fingerprint: this.fingerprint
+              }
             })
         if (ok) {
           this.state = 'success'
@@ -300,10 +304,14 @@ export default {
         this.$store.commit('token', null)
         this.timeoutToIdle()
       }
+    },
+    detectFingerprint() {
+      new FP2().get(res => this.fingerprint = res)
     }
   },
   async mounted() {
     await this.validateToken()
+    this.detectFingerprint()
   }
 }
 </script>
