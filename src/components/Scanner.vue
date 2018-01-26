@@ -1,9 +1,9 @@
 <template>
-  <div class="scanner" @click.stop="handleClick()">
+  <div class="scanner" @click="handleClick()">
     <button v-if="!autoStartCapture" class="debug auto-capture" @click.stop="handleAutoCapture">
       <Icon name="bug" />
     </button>
-    <video class="preview blur" ref="video" @loadedmetadata="handleVideoMeta" />
+    <video class="preview blur" ref="video" @loadedmetadata="handleVideoMeta" @playing="startIntervalScan" muted playsinline />
     <svg class="overlay" viewBox="0 0 640 640" shape-rendering="crispEdges">
       <defs>
         <mask id="clip">
@@ -66,6 +66,16 @@ export default {
         this.startCapture()
       }
     },
+    startIntervalScan() {
+      this.itvl = setInterval(() => this.scanFrame(), 250)
+      this.stream.getTracks()[0].onended = () => {
+        this.error = "摄像头已关闭，点击扫描框重新开始扫描"
+        this.stopCapture()
+      }
+      this.state = 'idle'
+      this.lastError = '正在扫描'
+      this.lastMessage = ''
+    },
     startCapture() {
       if (!this.supportRealtime) {
         this.error = '浏览器不支持实时采集，请点击扫描框拍照扫描'
@@ -84,14 +94,6 @@ export default {
           this.stream = stream
           this.$refs.video.srcObject = stream
           this.$refs.video.play()
-          this.itvl = setInterval(() => this.scanFrame(), 250)
-          this.stream.getTracks()[0].onended = () => {
-            this.error = "摄像头已关闭，点击扫描框重新开始扫描"
-            this.stopCapture()
-          }
-          this.state = 'idle'
-          this.lastError = '正在扫描'
-          this.lastMessage = ''
         },
         error => {
           this.$emit('error', error)
