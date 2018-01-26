@@ -12,6 +12,15 @@
     <NerdView v-if="nerdCounter >= 3" :value="internalStats" />
 
     <div :class="['stat', displayState]">
+      <div class="status-bar" v-if="token">
+        <EventList v-model="currentEvent" />
+        <!-- <button
+          v-if="fullscreenSupported"
+          class="fullscreen"
+          @click="toggleFullscreen"
+        ><Icon name="arrows-alt" /></button> -->
+      </div>
+
       <div class="state">
         <Icon
           @touchend.native.prevent="handleNerd"
@@ -31,15 +40,6 @@
           身份：{{ payload.role.join(', ') }} <br>
           时间：{{ payload.str_reported_at }} {{ payload.str_conclusion }}
         </template>
-      </div>
-
-      <div class="status-bar" v-if="token">
-        <EventList v-model="currentEvent" />
-        <!-- <button
-          v-if="fullscreenSupported"
-          class="fullscreen"
-          @click="toggleFullscreen"
-        ><Icon name="arrows-alt" /></button> -->
       </div>
     </div>
 
