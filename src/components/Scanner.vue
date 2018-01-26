@@ -21,6 +21,11 @@
     <canvas ref="canvas" />
     <input ref="file" @change="scanFile" style="display: none" type="file" capture="camera" accept="image/*">
     <canvas ref="fileCanvas" />
+    <!--
+      Hack for iOS Safari, need significant DOM update to start playback correctly
+      I guess it requires "repaint" to properly start playing
+    -->
+    <div style="color: rgba(0,0,0,0); position: fixed; top: 0; left: 0">{{ hackDom }}</div>
   </div>
 </template>
 
@@ -54,7 +59,8 @@ export default {
       itvl: null,
       error: null,
       autoStartCapture: !window.localStorage || !window.localStorage.getItem(DEV_AUTO_CAPTURE_KEY),
-      supportRealtime: navigator.mediaDevices && navigator.mediaDevices.getUserMedia
+      supportRealtime: navigator.mediaDevices && navigator.mediaDevices.getUserMedia,
+      hackDom: null
     }
   },
   methods: {
@@ -67,7 +73,12 @@ export default {
       }
     },
     startIntervalScan() {
-      this.itvl = setInterval(() => this.scanFrame(), 250)
+      this.itvl = setInterval(() => {
+        this.scanFrame()
+        // HACK: force a DOM update so iOS safari can playback normally
+        //       otherwise, video hangs at first frame
+        this.hackDom = Date.now()
+      }, 250)
       this.stream.getTracks()[0].onended = () => {
         this.error = "摄像头已关闭，点击扫描框重新开始扫描"
         this.stopCapture()
