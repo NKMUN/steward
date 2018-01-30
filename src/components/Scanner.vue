@@ -110,8 +110,7 @@ export default {
         },
         error => {
           this.$emit('error', error)
-          console.log(error)
-          alert(error.name + ': ' + error.message)
+          alert('请稍后重试：' + error.name + ' / ' + error.message)
           this.error = "摄像头已关闭，点击这里重新开始扫描"
         }
       )

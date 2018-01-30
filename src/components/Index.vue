@@ -82,7 +82,8 @@ export default {
       nerdSpawning: false,
       internalStats: null,
       currentEvent: null,
-      fingerprint: ''
+      fingerprint: '',
+      rawFingerprint: null
     }
   },
   computed: {
@@ -126,6 +127,14 @@ export default {
       this.state = 'error'
       this.lastError = '未能打开摄像头'
       this.lastMessage = error.message
+      console.log(error)
+      const nop = () => null
+      this.$agent.post('/api/client-errors/').send({
+        fingerprint: this.fingerprint,
+        spec: this.rawFingerprint,
+        error: JSON.parse(JSON.stringify(error))
+      })
+      .then(nop, nop)
     },
     handleCaptureStart() {
       if (this.state === 'error') {
@@ -306,7 +315,10 @@ export default {
       }
     },
     detectFingerprint() {
-      new FP2().get(res => this.fingerprint = res)
+      new FP2().get((res, compos) => {
+        this.fingerprint = res
+        this.rawFingerprint = compos.reduce((ret, cur) => ({...ret, [cur.key]: cur.value}), {})
+      })
     }
   },
   async mounted() {
