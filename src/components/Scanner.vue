@@ -33,6 +33,7 @@
 import QR from '@/qr-decode.js'
 import { nop } from '@/qr-decode.js'
 import 'vue-awesome/icons/bug'
+import adapter from "webrtc-adapter"
 
 const DEV_AUTO_CAPTURE_KEY = 'dev/no-auto-capture'
 
