@@ -80,7 +80,7 @@ export default {
         this.hackDom = Date.now()
       }, 250)
       this.stream.getTracks()[0].onended = () => {
-        this.error = "摄像头已关闭，点击扫描框重新开始扫描"
+        this.error = "摄像头已关闭，点击这里重新开始扫描"
         this.stopCapture()
       }
       this.state = 'idle'
@@ -89,16 +89,17 @@ export default {
     },
     startCapture() {
       if (!this.supportRealtime) {
-        this.error = '浏览器不支持实时采集，请点击扫描框拍照扫描'
+        this.error = '浏览器不支持实时采集，点击这里拍照扫描'
         return
       }
       navigator.mediaDevices.getUserMedia({
         video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
+          width: { ideal: 1280, min: 640 },
+          height: { ideal: 720, min: 640 },
           facingMode: { ideal: 'environment' },
           ... this.constraint
-        }
+        },
+        audio: false
       }).then(
         stream => {
           this.$emit('started', stream)
@@ -109,7 +110,8 @@ export default {
         error => {
           this.$emit('error', error)
           console.log(error)
-          alert(error)
+          alert(error.name + ': ' + error.message)
+          this.error = "摄像头已关闭，点击这里重新开始扫描"
         }
       )
     },
